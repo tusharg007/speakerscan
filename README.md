@@ -15,7 +15,7 @@ pinned: false
     Speaker Diarization · Emotion Classification · Language Identification
   </p>
   <p align="center">
-    <a href="https://huggingface.co/spaces/tusharg007/speakerscan">
+    <a href="https://huggingface.co/spaces/champTUSHARg007/speakerscan">
       <img src="https://img.shields.io/badge/🤗%20Live%20Demo-HuggingFace%20Spaces-blue" alt="HF Spaces">
     </a>
     <a href="https://github.com/tusharg007/speakerscan">
@@ -47,7 +47,7 @@ Modern TTS and dubbing systems (like those at Sarvam AI, ElevenLabs, or Coqui) n
 
 ## 🚀 Live Demo
 
-**Try it now:** [huggingface.co/spaces/tusharg007/speakerscan](https://huggingface.co/spaces/tusharg007/speakerscan)
+**Try it now:** [huggingface.co/spaces/champTUSHARg007/speakerscan](https://huggingface.co/spaces/champTUSHARg007/speakerscan)
 
 Upload any audio file or paste a YouTube URL. The pipeline will:
 1. Convert to 16kHz mono WAV
@@ -262,18 +262,24 @@ If the downstream stage crashes, the upstream data is perfectly intact for retry
 
 1. **Create a new Space** at [huggingface.co/new-space](https://huggingface.co/new-space)
    - Space name: `speakerscan`
-   - SDK: **Streamlit**
+   - SDK: **Docker** (Select the **Blank** template so it uses our custom `Dockerfile`)
    - Hardware: **CPU Basic** (free — 2 vCPUs, 16 GB RAM)
-   - Connect your GitHub repo: `tusharg007/speakerscan`
 
-2. **Add your HF token** in Settings → Repository Secrets:
+2. **Add your HF token** in Space Settings → Variables and secrets:
+   - Click **New secret**
    - Name: `HF_TOKEN`
-   - Value: `hf_your_token_here`
+   - Value: Your HuggingFace Access Token (with Write access)
 
-3. **Done.** The Space builds automatically. Your app will be live at:
-   ```
-   https://huggingface.co/spaces/tusharg007/speakerscan
-   ```
+3. **Push the code**:
+   - Add the Hugging Face Space repository as a Git remote locally and push to it:
+     ```bash
+     git remote add hf https://huggingface.co/spaces/champTUSHARg007/speakerscan
+     git push -f hf main
+     ```
+   - The Space will automatically build the custom container and run the app. Your app will be live at:
+     ```
+     https://huggingface.co/spaces/champTUSHARg007/speakerscan
+     ```
 
 ### Running Locally
 
