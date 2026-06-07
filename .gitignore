@@ -1,0 +1,32 @@
+# Environment secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Data directories (don't push gigabytes of audio to GitHub)
+data/raw/
+data/audio/
+data/annotations/
+data/logs/
+data/checkpoint.json
+_test_output/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store

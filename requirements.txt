@@ -1,0 +1,39 @@
+# Speech Data Pipeline — Cloud Requirements (HF Spaces / Docker)
+# CPU-only PyTorch via extra index URL.
+# Pinned versions from a verified working environment.
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Streamlit UI
+streamlit==1.45.1
+plotly==6.1.2
+
+# Deep learning (CPU-only)
+torch==2.6.0+cpu
+torchaudio==2.6.0+cpu
+transformers==4.52.4
+
+# Speaker diarization
+pyannote.audio==3.3.2
+
+# Language detection
+openai-whisper==20250625
+
+# Audio download & conversion
+yt-dlp==2026.3.17
+ffmpeg-python==0.2.0
+
+# Audio processing
+librosa==0.11.0
+soundfile==0.13.1
+
+# Data processing
+numpy==2.2.6
+pandas==2.3.0
+
+# Logging
+loguru==0.7.3
+
+# Environment
+python-dotenv==1.1.0
+huggingface-hub==0.33.1

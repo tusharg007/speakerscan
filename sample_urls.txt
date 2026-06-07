@@ -1,0 +1,18 @@
+# Sample URLs for testing the speech data pipeline
+# All sources are public domain / Creative Commons — safe for testing.
+
+# LibriVox — public domain audiobooks (multi-voice: intro narrator + chapter reader)
+# "The Art of War" by Sun Tzu — short chapter, clear English, ~3 min
+https://www.youtube.com/watch?v=sZ3g5gLj5GE
+
+# TED Talk — Creative Commons licensed, single speaker, clear audio
+# "The danger of a single story" — Chimamanda Ngozi Adichie (~19 min)
+https://www.youtube.com/watch?v=D9Ihs241zeg
+
+# NASA — public domain US government content, narration + interviews
+# ISS Tour — multiple speakers, ~5 min
+https://www.youtube.com/watch?v=SGP6Y0Pnhe4
+
+# Wikimedia Commons — public domain speech sample (short, ~2 min)
+# Universal Declaration of Human Rights — clear single speaker
+https://www.youtube.com/watch?v=5RR4VXNX3jA
