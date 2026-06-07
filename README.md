@@ -1,3 +1,13 @@
+---
+title: SpeakerScan
+emoji: 🎙️
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 8501
+pinned: false
+---
+
 <p align="center">
   <h1 align="center">🎙️ SpeakerScan</h1>
   <p align="center">
