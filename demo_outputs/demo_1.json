@@ -1,0 +1,65 @@
+[
+  {
+    "speaker": "SPEAKER_00",
+    "start": 0.5,
+    "end": 5.2,
+    "emotion": "neutral",
+    "emotion_confidence": 0.89,
+    "language": "hi",
+    "language_confidence": 0.95
+  },
+  {
+    "speaker": "SPEAKER_01",
+    "start": 5.8,
+    "end": 12.1,
+    "emotion": "happy",
+    "emotion_confidence": 0.72,
+    "language": "hi",
+    "language_confidence": 0.91
+  },
+  {
+    "speaker": "SPEAKER_00",
+    "start": 12.5,
+    "end": 18.3,
+    "emotion": "neutral",
+    "emotion_confidence": 0.85,
+    "language": "hi",
+    "language_confidence": 0.93
+  },
+  {
+    "speaker": "SPEAKER_01",
+    "start": 19.0,
+    "end": 25.7,
+    "emotion": "sad",
+    "emotion_confidence": 0.61,
+    "language": "hi",
+    "language_confidence": 0.88
+  },
+  {
+    "speaker": "SPEAKER_00",
+    "start": 26.2,
+    "end": 32.0,
+    "emotion": "angry",
+    "emotion_confidence": 0.78,
+    "language": "hi",
+    "language_confidence": 0.94
+  },
+  {
+    "speaker": "SPEAKER_01",
+    "start": 32.5,
+    "end": 38.1,
+    "emotion": "neutral",
+    "emotion_confidence": 0.82,
+    "language": "hi",
+    "language_confidence": 0.9
+  },
+  {
+    "speaker": "SPEAKER_00",
+    "start": 38.8,
+    "end": 44.5,
+    "emotion": "happy",
+    "emotion_confidence": 0.69,
+    "language": "hi",
+    "language_confidence": 0.92
+  }
+]

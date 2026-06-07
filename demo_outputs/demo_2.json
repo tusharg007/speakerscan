@@ -1,0 +1,47 @@
+[
+  {
+    "speaker": "SPEAKER_00",
+    "start": 0.3,
+    "end": 6.8,
+    "emotion": "neutral",
+    "emotion_confidence": 0.91,
+    "language": "en",
+    "language_confidence": 0.98
+  },
+  {
+    "speaker": "SPEAKER_00",
+    "start": 7.2,
+    "end": 13.5,
+    "emotion": "neutral",
+    "emotion_confidence": 0.88,
+    "language": "en",
+    "language_confidence": 0.97
+  },
+  {
+    "speaker": "SPEAKER_00",
+    "start": 14.0,
+    "end": 19.8,
+    "emotion": "surprise",
+    "emotion_confidence": 0.65,
+    "language": "en",
+    "language_confidence": 0.96
+  },
+  {
+    "speaker": "SPEAKER_00",
+    "start": 20.3,
+    "end": 25.1,
+    "emotion": "happy",
+    "emotion_confidence": 0.73,
+    "language": "en",
+    "language_confidence": 0.99
+  },
+  {
+    "speaker": "SPEAKER_00",
+    "start": 25.8,
+    "end": 30.0,
+    "emotion": "neutral",
+    "emotion_confidence": 0.86,
+    "language": "en",
+    "language_confidence": 0.97
+  }
+]
