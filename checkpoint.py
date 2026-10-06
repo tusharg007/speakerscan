@@ -2,8 +2,8 @@
 Idempotency checkpoint manager.
 
 Tracks per-file processing state across pipeline stages so that a
-crashed or interrupted run can be resumed without re-processing
-completed work.  State is persisted to a JSON file with atomic writes
+crashed or interrupted run can reuse validated downloaded audio and RTTM.
+In-memory enrichment is recomputed on resume. State is persisted with atomic writes
 (write-to-tmp-then-rename) to prevent corruption on mid-write crashes.
 
 The checkpoint records four pipeline stages in order:

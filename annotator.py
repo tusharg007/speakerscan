@@ -8,8 +8,8 @@ Produces three output formats:
     3. **Master CSV manifest** — one row per processed file with summary
        statistics.
 
-All file writes are atomic (write-to-tmp → rename) to prevent corrupt
-output on crashes.
+Per-file JSON writes are atomic (write-to-tmp → rename). The CSV manifest
+is appended under a thread lock.
 """
 
 from __future__ import annotations

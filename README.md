@@ -140,10 +140,10 @@ Audio Upload  ─┘    convert      │     WAV      │
 
 | Decision | Why | Alternative Considered |
 |----------|-----|----------------------|
-| **Stage-level checkpointing** | If emotion classification crashes after 20-min diarization, resume from where it stopped — don't re-run everything | Binary done/not-done flag (forces full re-run) |
+| **Stage-level checkpointing** | Reuse validated converted audio and RTTM; recompute in-memory emotion and language enrichment after a crash | Binary done/not-done flag (forces full re-run) |
 | **Immutable segment data** | Each stage returns a *new* list. If language detection fails halfway, emotion data is untouched | In-place mutation (corrupts upstream data on partial failure) |
 | **Thread-safe inference locks** | `threading.Lock()` around all model `.forward()` calls. Safe for `--workers 2` without multiprocessing overhead | Process-based parallelism (4x memory cost, IPC complexity) |
-| **Atomic file writes** | Write to `.tmp` then `os.replace()`. Prevents corrupt JSON/CSV if process dies mid-write | Direct writes (corrupt files on crash — invisible until a reviewer runs your code) |
+| **Atomic checkpoint and annotation writes** | Write checkpoint, RTTM, and per-file JSON through `.tmp` files before replacement | Direct writes (can leave partial files after a crash) |
 | **Lazy singleton models** | Load pyannote + wav2vec2 + Whisper once, reuse across all files. Never reload per-file | Per-file loading (OOM after 3 files on 16 GB RAM) |
 | **CPU-first deployment** | HF Spaces free tier has no GPU. Pipeline works on CPU; CUDA is auto-detected when available | GPU-required (blocks free-tier deployment) |
 
@@ -159,7 +159,7 @@ Audio Upload  ─┘    convert      │     WAV      │
 - Lazy singleton loading — models are initialized once and cached for the lifetime of the app
 - Whisper `tiny` variant (39M params) instead of `base` or `small` — sufficient for language ID
 - Audio segments are processed sequentially, never loaded entirely into memory
-- `tempfile.mkdtemp()` for all intermediate files — auto-cleaned by OS
+- Temporary files are removed after each Streamlit run
 
 ### Challenge 2: Thread Safety Without Deadlocks
 
@@ -215,7 +215,7 @@ def _resolve_ffmpeg():
   }
 }
 ```
-On restart, the pipeline reads the checkpoint, sees that `download` and `diarize` are done, loads the RTTM from disk, and resumes from `emotion`. Atomic writes (`write .tmp → rename`) prevent checkpoint corruption.
+On restart, the pipeline reuses a valid converted WAV and RTTM, then recomputes emotion and language because those intermediate results exist only in memory. Missing or invalid artifacts are regenerated. Atomic writes (`write .tmp → rename`) prevent partial checkpoint and annotation files.
 
 ### Challenge 5: Immutable Data Flow for Partial Failures
 
@@ -231,7 +231,7 @@ def classify_segments(wav_path, segments):
         enriched.append(new_seg)
     return enriched  # Original 'segments' list is untouched
 ```
-If the downstream stage crashes, the upstream data is perfectly intact for retry.
+If a downstream stage crashes, the upstream list remains intact during that run; a restarted run recomputes enrichment from the saved RTTM.
 
 ---
 
@@ -423,7 +423,7 @@ speakerscan/
 | `diarizer.py` | 206 | pyannote integration, RTTM output |
 | `emotion_classifier.py` | 206 | wav2vec2 emotion classification (immutable) |
 | `language_detector.py` | 188 | Whisper language ID (immutable) |
-| `annotator.py` | 215 | JSON/CSV writing with atomic operations |
+| `annotator.py` | 215 | Atomic per-file JSON writing and locked CSV manifest append |
 | `config.py` | 73 | All constants in one place |
 
 ---

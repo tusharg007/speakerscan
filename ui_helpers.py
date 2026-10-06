@@ -276,9 +276,6 @@ def run_pipeline_thread(
     progress: PipelineProgress,
 ) -> None:
     """Run the full pipeline in a background thread, posting progress updates."""
-    import os
-    os.environ.setdefault("HF_TOKEN", hf_token or "")
-
     try:
         from config import ensure_dirs
         from diarizer import diarize, write_rttm
@@ -339,6 +336,8 @@ def run_pipeline_thread(
     except Exception as exc:
         logger.error("Pipeline thread error: %s", exc)
         progress.error = f"{type(exc).__name__}: {exc}\n\n{traceback.format_exc()}"
+        if hf_token:
+            progress.error = progress.error.replace(hf_token, "[redacted]")
         progress.done = True
 
 
@@ -356,11 +355,10 @@ def convert_uploaded_file(uploaded_file, output_dir: Path) -> tuple[Path | None,
     try:
         _convert_to_wav(raw_path, wav_path)
         if not _validate_wav(wav_path):
-            return None, file_id
+            raise ValueError("Invalid audio: converted file is unreadable or shorter than one second")
         return wav_path, file_id
     except Exception as exc:
-        logger.error("Conversion failed: %s", exc)
-        return None, file_id
+        raise RuntimeError(f"Audio conversion failed: {exc}") from exc
     finally:
         if raw_path.exists():
             raw_path.unlink(missing_ok=True)

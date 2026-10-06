@@ -24,7 +24,7 @@ EXPOSE 8501
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s \
-    CMD curl -f http://localhost:8501/_stcore/health || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=5)"
 
 # Run Streamlit
 CMD ["streamlit", "run", "app.py", \

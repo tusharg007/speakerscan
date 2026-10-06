@@ -20,6 +20,7 @@ and the pipeline moves to the next file.
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import sys
 import time
@@ -37,7 +38,7 @@ from annotator import update_manifest, write_json_annotations
 from checkpoint import CheckpointManager
 from config import DEFAULT_WORKERS, ensure_dirs
 from diarizer import diarize, write_rttm
-from downloader import download_audio, extract_file_id
+from downloader import _validate_wav, download_audio, extract_file_id
 from emotion_classifier import classify_segments
 from language_detector import detect_language_segments
 
@@ -75,8 +76,9 @@ def process_file(
 
     try:
         # ── Stage 1: Download ───────────────────────────────
-        wav_path = None
-        if checkpoint.should_run_stage(file_id, "download"):
+        wav_path = dirs["audio"] / f"{file_id}.wav"
+        if (checkpoint.should_run_stage(file_id, "download") or
+                not wav_path.exists() or not _validate_wav(wav_path)):
             logger.info("[{}] ▶ Stage: download", file_id)
             stage_start = time.perf_counter()
 
@@ -97,16 +99,20 @@ def process_file(
             )
         else:
             # Resuming — WAV should already exist
-            wav_path = dirs["audio"] / f"{file_id}.wav"
-            if not wav_path.exists():
-                raise FileNotFoundError(
-                    f"Checkpoint says download is done but {wav_path} is missing"
-                )
             logger.info("[{}] ⏭ download (already done)", file_id)
 
         # ── Stage 2: Diarization ────────────────────────────
         segments: list[dict] = []
-        if checkpoint.should_run_stage(file_id, "diarize"):
+        rttm_path = dirs["annotations"] / f"{file_id}.rttm"
+        need_diarize = checkpoint.should_run_stage(file_id, "diarize")
+        if not need_diarize:
+            try:
+                segments = _load_segments_from_rttm(rttm_path, file_id)
+                logger.info("[{}] ⏭ diarize (loaded RTTM)", file_id)
+            except (OSError, ValueError, UnicodeError) as exc:
+                logger.warning("[{}] Re-running diarization: {}", file_id, exc)
+                need_diarize = True
+        if need_diarize:
             logger.info("[{}] ▶ Stage: diarize", file_id)
             stage_start = time.perf_counter()
 
@@ -120,12 +126,6 @@ def process_file(
                 len(segments),
                 time.perf_counter() - stage_start,
             )
-        else:
-            logger.info("[{}] ⏭ diarize (already done)", file_id)
-            # Load segments from existing RTTM for downstream stages
-            segments = _load_segments_from_rttm(
-                dirs["annotations"] / f"{file_id}.rttm", file_id
-            )
 
         # Handle no-speech case
         if not segments:
@@ -137,62 +137,30 @@ def process_file(
             checkpoint.mark_completed(file_id)
             return True
 
-        # ── Stage 3: Emotion classification ─────────────────
-        enriched_segments: list[dict] = segments
-        if checkpoint.should_run_stage(file_id, "emotion"):
-            logger.info("[{}] ▶ Stage: emotion", file_id)
-            stage_start = time.perf_counter()
-
-            enriched_segments = classify_segments(wav_path, segments)
-
-            checkpoint.mark_stage(file_id, "emotion")
-            logger.info(
-                "[{}] ✓ emotion ({:.1f}s)",
-                file_id,
-                time.perf_counter() - stage_start,
-            )
-        else:
-            logger.info("[{}] ⏭ emotion (already done)", file_id)
+        # Enrichment is only in memory until annotation. Recompute it on resume;
+        # checkpoint flags alone cannot reconstruct it from the speaker-only RTTM.
+        logger.info("[{}] ▶ Stage: emotion", file_id)
+        stage_start = time.perf_counter()
+        enriched_segments = classify_segments(wav_path, segments)
+        checkpoint.mark_stage(file_id, "emotion")
+        logger.info("[{}] ✓ emotion ({:.1f}s)", file_id, time.perf_counter() - stage_start)
 
         # ── Stage 4: Language detection ─────────────────────
-        if checkpoint.should_run_stage(file_id, "language"):
-            logger.info("[{}] ▶ Stage: language", file_id)
-            stage_start = time.perf_counter()
-
-            enriched_segments = detect_language_segments(wav_path, enriched_segments)
-
-            checkpoint.mark_stage(file_id, "language")
-            logger.info(
-                "[{}] ✓ language ({:.1f}s)",
-                file_id,
-                time.perf_counter() - stage_start,
-            )
-        else:
-            logger.info("[{}] ⏭ language (already done)", file_id)
+        logger.info("[{}] ▶ Stage: language", file_id)
+        stage_start = time.perf_counter()
+        enriched_segments = detect_language_segments(wav_path, enriched_segments)
+        checkpoint.mark_stage(file_id, "language")
+        logger.info("[{}] ✓ language ({:.1f}s)", file_id, time.perf_counter() - stage_start)
 
         # ── Stage 5: Write annotations ──────────────────────
-        if checkpoint.should_run_stage(file_id, "annotate"):
-            logger.info("[{}] ▶ Stage: annotate", file_id)
-            stage_start = time.perf_counter()
-
-            write_json_annotations(enriched_segments, file_id, dirs["annotations"])
-            update_manifest(
-                file_id,
-                url_or_path,
-                "completed",
-                enriched_segments,
-                wav_path,
-                dirs["annotations"],
-            )
-
-            checkpoint.mark_stage(file_id, "annotate")
-            logger.info(
-                "[{}] ✓ annotate ({:.1f}s)",
-                file_id,
-                time.perf_counter() - stage_start,
-            )
-        else:
-            logger.info("[{}] ⏭ annotate (already done)", file_id)
+        logger.info("[{}] ▶ Stage: annotate", file_id)
+        stage_start = time.perf_counter()
+        write_json_annotations(enriched_segments, file_id, dirs["annotations"])
+        update_manifest(
+            file_id, url_or_path, "completed", enriched_segments, wav_path, dirs["annotations"]
+        )
+        checkpoint.mark_stage(file_id, "annotate")
+        logger.info("[{}] ✓ annotate ({:.1f}s)", file_id, time.perf_counter() - stage_start)
 
         checkpoint.mark_completed(file_id)
         elapsed = time.perf_counter() - pipeline_start
@@ -289,28 +257,21 @@ def _load_segments_from_rttm(rttm_path: Path, file_id: str) -> list[dict]:
     """
     segments: list[dict] = []
     if not rttm_path.exists():
-        logger.warning("[{}] RTTM not found at {} — cannot resume", file_id, rttm_path)
-        return segments
+        raise FileNotFoundError(rttm_path)
 
-    try:
-        for line in rttm_path.read_text(encoding="utf-8").strip().splitlines():
-            parts = line.split()
-            if len(parts) >= 9 and parts[0] == "SPEAKER":
-                start = float(parts[3])
-                duration = float(parts[4])
-                speaker = parts[7]
-                segments.append(
-                    {
-                        "speaker": speaker,
-                        "start": round(start, 3),
-                        "end": round(start + duration, 3),
-                    }
-                )
-        logger.debug(
-            "[{}] Loaded {} segments from RTTM", file_id, len(segments)
-        )
-    except Exception as exc:
-        logger.error("[{}] Failed to parse RTTM: {}", file_id, exc)
+    for line in rttm_path.read_text(encoding="utf-8").strip().splitlines():
+        parts = line.split()
+        if len(parts) < 9 or parts[0] != "SPEAKER":
+            raise ValueError(f"Malformed RTTM line: {line[:80]}")
+        start = float(parts[3])
+        duration = float(parts[4])
+        if not math.isfinite(start) or not math.isfinite(duration) or start < 0 or duration <= 0:
+            raise ValueError("Invalid RTTM segment time")
+        segments.append({
+            "speaker": parts[7], "start": round(start, 3),
+            "end": round(start + duration, 3),
+        })
+    logger.debug("[{}] Loaded {} segments from RTTM", file_id, len(segments))
 
     return segments
 

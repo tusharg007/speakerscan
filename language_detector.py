@@ -124,6 +124,8 @@ def detect_language_segment(
         return {"language": top_lang, "language_confidence": top_conf}
 
     except Exception as exc:
+        if isinstance(exc, MemoryError) or "out of memory" in str(exc).lower():
+            raise
         logger.warning(
             "Language detection failed for [{:.1f}–{:.1f}s] in {}: {}",
             start,

@@ -13,6 +13,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import queue
+import shutil
 import tempfile
 import time
 from pathlib import Path
@@ -48,7 +50,6 @@ MODEL_LINKS = {
 # Import helpers (after page config)
 from ui_helpers import (
     DEMO_SAMPLES,
-    LANGUAGE_OPTIONS,
     SUPPORTED_FORMATS,
     STAGE_WEIGHTS,
     PipelineProgress,
@@ -175,22 +176,21 @@ def run_and_show_progress(
     while not progress.done:
         try:
             update = progress.queue.get(timeout=0.5)
-            pct = update["progress"]
-            msg = update["message"]
-            elapsed = update["elapsed"]
-            ts = update["timestamp"]
+        except queue.Empty:
+            continue
+        pct = update["progress"]
+        msg = update["message"]
+        elapsed = update["elapsed"]
+        ts = update["timestamp"]
 
-            progress_bar.progress(pct, text=msg)
-            elapsed_str = f" ({elapsed:.1f}s)" if elapsed > 0 else ""
-            log_line = f"`{ts}` {msg}{elapsed_str}"
-            log_lines.append(log_line)
+        progress_bar.progress(pct, text=msg)
+        elapsed_str = f" ({elapsed:.1f}s)" if elapsed > 0 else ""
+        log_line = f"`{ts}` {msg}{elapsed_str}"
+        log_lines.append(log_line)
 
-            with status_container:
-                for line in log_lines:
-                    st.markdown(line)
-
-        except Exception:
-            pass  # queue.Empty — just poll again
+        with status_container:
+            for line in log_lines:
+                st.markdown(line)
 
     # Final state
     thread.join(timeout=5)
@@ -211,28 +211,33 @@ def run_and_show_progress(
 
 def _handle_pipeline_error(error_text: str) -> None:
     """Display appropriate error message based on error type."""
-    if "out of memory" in error_text.lower():
+    error_lower = error_text.splitlines()[0].lower()
+    if "out of memory" in error_lower or "memoryerror" in error_lower:
         st.error(
             "💾 **Out of Memory Error**\n\n"
             "The audio file is too long for the available RAM (16 GB). "
             "Try a shorter audio clip (< 5 minutes recommended on free tier).",
             icon="🚨",
         )
-    elif "hf_token" in error_text.lower() or "401" in error_text:
+    elif any(term in error_lower for term in ("hf_token environment variable not set", "401", "403", "gated", "license", "forbidden", "unauthorized")):
         st.warning(
             "🔐 **Authentication Error**\n\n"
-            "The HuggingFace token is missing or invalid. "
-            "Add `HF_TOKEN` in Settings > Secrets.",
+            "Check `HF_TOKEN` and accept access to both pyannote/speaker-diarization-3.1 "
+            "and pyannote/segmentation-3.0 on Hugging Face.",
             icon="⚠️",
         )
-    elif "ffmpeg" in error_text.lower():
+    elif "ffmpeg" in error_lower or "audio conversion" in error_lower:
         st.error(
-            "🔧 **FFmpeg Error**\n\n"
-            "FFmpeg is not available. If running on HF Spaces, ensure "
-            "`packages.txt` contains `ffmpeg`. Locally, install ffmpeg "
-            "and add it to PATH.",
+            "🔧 **Audio conversion failed**\n\n"
+            "Check that the file is valid and FFmpeg is installed and runnable.",
             icon="🚨",
         )
+    elif "invalid" in error_lower and "audio" in error_lower:
+        st.error("The audio file is corrupt, unsupported, or shorter than one second.")
+    elif any(term in error_lower for term in ("connection", "network", "download", "timeout")):
+        st.error("A model could not be downloaded. Check the network and try again.")
+    elif "failed to load diarization model" in error_lower:
+        st.error("The diarization model could not load. Check your HF token, model access, and network.")
     else:
         st.error("Pipeline failed. See details below.", icon="🚨")
 
@@ -350,26 +355,6 @@ def main() -> None:
             "YouTube URL",
             placeholder="https://www.youtube.com/watch?v=...",
         )
-        st.selectbox(
-            "Audio quality",
-            options=["128k", "192k", "320k"],
-            index=0,
-            key="audio_quality",
-        )
-
-    # Controls below both tabs
-    col_lang, col_dur = st.columns(2)
-    with col_lang:
-        st.selectbox("Expected language", LANGUAGE_OPTIONS, key="expected_language")
-    with col_dur:
-        st.slider(
-            "Min segment duration (s)",
-            min_value=0.5,
-            max_value=5.0,
-            value=1.0,
-            step=0.5,
-            key="min_segment_duration",
-        )
 
     # Demo samples
     demo_result = render_demo_samples()
@@ -380,7 +365,6 @@ def main() -> None:
     st.divider()
 
     # Run button
-    run_disabled = (not hf_token) and (uploaded_file is None and not youtube_url)
     if st.button("🚀 Run Pipeline", type="primary", use_container_width=True, disabled=not hf_token):
         if not uploaded_file and not youtube_url:
             st.warning("Please upload an audio file or enter a YouTube URL.")
@@ -430,7 +414,11 @@ def main() -> None:
 
         except Exception as exc:
             error_text = f"{type(exc).__name__}: {exc}\n\n{__import__('traceback').format_exc()}"
+            if hf_token:
+                error_text = error_text.replace(hf_token, "[redacted]")
             _handle_pipeline_error(error_text)
+        finally:
+            shutil.rmtree(work_dir, ignore_errors=True)
 
     # ── Results section ─────────────────────────────────────
     if "pipeline_result" in st.session_state:

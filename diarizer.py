@@ -84,11 +84,11 @@ def get_pipeline(hf_token: str | None = None) -> PyannotePipeline:
             pipeline.to(torch.device(device))
             _pipeline = pipeline
         except Exception as exc:
+            detail = str(exc).replace(token, "[redacted]")
             raise RuntimeError(
-                f"Failed to load diarization model.  "
-                f"Have you accepted the license at "
-                f"https://huggingface.co/{DIARIZATION_MODEL} ?  "
-                f"Original error: {exc}"
+                "Failed to load diarization model. Check token permissions for "
+                "pyannote/speaker-diarization-3.1 and pyannote/segmentation-3.0, "
+                f"and check connectivity. Original error: {detail}"
             ) from exc
 
         elapsed = time.perf_counter() - start
