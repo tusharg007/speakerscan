@@ -1,0 +1,4 @@
+[server]
+# PyTorch custom classes and SpeechBrain lazy optional modules cannot be
+# safely introspected by Streamlit's source watcher. Restart after code edits.
+fileWatcherType = "none"

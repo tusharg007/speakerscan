@@ -415,7 +415,7 @@ speakerscan/
 
 | Module | Lines | Responsibility |
 |--------|-------|----------------|
-| `app.py` | 444 | Streamlit UI — input tabs, progress tracking, result rendering |
+| `app.py` | 458 | Streamlit UI — input source selector, progress tracking, result rendering |
 | `ui_helpers.py` | 380 | Plotly timeline, formatting, threaded pipeline runner |
 | `main.py` | 442 | CLI orchestrator, batch processing, logging setup |
 | `checkpoint.py` | 180 | Thread-safe checkpoint with 5-stage tracking |
@@ -469,8 +469,13 @@ python main.py --input sample_urls.txt --output ./data
 | `HF_TOKEN not set` | Create `.env` file or set env var. On HF Spaces: Settings → Secrets |
 | `401 Unauthorized` | Accept model licenses at [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1) |
 | `ffmpeg not found` | Install ffmpeg (`apt install ffmpeg` or `pip install imageio-ffmpeg`) |
+| `No module named 'matplotlib'` | Install the current requirements in the same environment as Streamlit: `python -m pip install -r requirements.txt`, then restart. A configured token does not install Python dependencies. |
+| `Weights only load failed` with PyTorch 2.6 | Use the current `diarizer.py`, which scopes an allowlist to the official pyannote checkpoint metadata. Keep restricted checkpoint loading enabled. |
+| Emotion head weights are unused/newly initialized | Use the current `emotion_model.py` adapter. It restores the checkpoint's dense/tanh/output head and rejects incomplete loads instead of silently using an untrained classifier. |
+| Watcher errors mentioning `torch.classes`, `k2`, or `flair` | The project sets `server.fileWatcherType = "none"` in `.streamlit/config.toml`. Run from the repository root and restart Streamlit after updating configuration or source. These optional modules are not needed for this pipeline. |
 | `Out of memory` | Use shorter audio (<5 min on free tier). Or upgrade to GPU Space |
 | `yt-dlp: video unavailable` | URL may be region-locked, private, or removed |
+| YouTube run shows an earlier upload's results | Use the input source selector to choose YouTube URL. New runs clear earlier annotations, and successful results show the source URL/video ID above the table. |
 | Checkpoint stuck `in_progress` | Delete `checkpoint.json` and re-run |
 
 ---

@@ -25,6 +25,8 @@ from pathlib import Path
 import torch
 from loguru import logger
 from pyannote.audio import Pipeline as PyannotePipeline
+from pyannote.audio.core.task import Problem, Resolution, Specifications
+from torch.torch_version import TorchVersion
 
 from config import DIARIZATION_MODEL
 
@@ -77,12 +79,24 @@ def get_pipeline(hf_token: str | None = None) -> PyannotePipeline:
         start = time.perf_counter()
 
         try:
-            pipeline = PyannotePipeline.from_pretrained(
-                DIARIZATION_MODEL,
-                use_auth_token=token,
-            )
+            # The official pyannote 3.x checkpoint contains these metadata
+            # types. PyTorch 2.6 defaults to weights_only=True. Allow only
+            # these known types for this load; keep restricted loading enabled.
+            with torch.serialization.safe_globals(
+                [TorchVersion, Specifications, Problem, Resolution]
+            ):
+                pipeline = PyannotePipeline.from_pretrained(
+                    DIARIZATION_MODEL,
+                    use_auth_token=token,
+                )
             pipeline.to(torch.device(device))
             _pipeline = pipeline
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                f"Diarization dependency '{exc.name or 'unknown'}' is missing. "
+                "Install requirements.txt in the Python environment running "
+                "SpeakerScan, then restart the app."
+            ) from exc
         except Exception as exc:
             detail = str(exc).replace(token, "[redacted]")
             raise RuntimeError(

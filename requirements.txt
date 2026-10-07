@@ -15,6 +15,8 @@ transformers==4.52.4
 
 # Speaker diarization
 pyannote.audio==3.3.2
+# Imported by pyannote's diarization pipeline when it is loaded lazily.
+matplotlib==3.10.3
 
 # Language detection
 openai-whisper==20250625

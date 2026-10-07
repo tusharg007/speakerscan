@@ -219,6 +219,13 @@ def _handle_pipeline_error(error_text: str) -> None:
             "Try a shorter audio clip (< 5 minutes recommended on free tier).",
             icon="🚨",
         )
+    elif "diarization dependency" in error_lower or "no module named" in error_lower:
+        st.error(
+            "A Python dependency needed by the pipeline is missing. "
+            "Install requirements.txt in the environment running SpeakerScan, "
+            "then restart the app.\n\n" + error_text.splitlines()[0],
+            icon="🔧",
+        )
     elif any(term in error_lower for term in ("hf_token environment variable not set", "401", "403", "gated", "license", "forbidden", "unauthorized")):
         st.warning(
             "🔐 **Authentication Error**\n\n"
@@ -237,7 +244,7 @@ def _handle_pipeline_error(error_text: str) -> None:
     elif any(term in error_lower for term in ("connection", "network", "download", "timeout")):
         st.error("A model could not be downloaded. Check the network and try again.")
     elif "failed to load diarization model" in error_lower:
-        st.error("The diarization model could not load. Check your HF token, model access, and network.")
+        st.error("The diarization model could not load.\n\n" + error_text.splitlines()[0])
     else:
         st.error("Pipeline failed. See details below.", icon="🚨")
 
@@ -338,37 +345,50 @@ def main() -> None:
     # ── Input section ───────────────────────────────────────
     st.header("📂 Input")
 
-    tab_upload, tab_youtube = st.tabs(["📁 Upload audio", "🔗 YouTube URL"])
+    input_source = st.radio(
+        "Input source", ["📁 Upload audio", "🔗 YouTube URL"], horizontal=True,
+        key="input_source",
+    )
 
     uploaded_file = None
     youtube_url = ""
 
-    with tab_upload:
+    if input_source == "📁 Upload audio":
         uploaded_file = st.file_uploader(
             "Upload an audio file",
             type=SUPPORTED_FORMATS,
             help=f"Supported: {', '.join(SUPPORTED_FORMATS)}. Max {MAX_UPLOAD_MB} MB.",
         )
 
-    with tab_youtube:
+    else:
         youtube_url = st.text_input(
             "YouTube URL",
             placeholder="https://www.youtube.com/watch?v=...",
         )
+        youtube_url = youtube_url.strip()
 
     # Demo samples
     demo_result = render_demo_samples()
     if demo_result is not None:
         st.session_state["pipeline_result"] = demo_result
         st.session_state["pipeline_duration"] = max(s.get("end", 0) for s in demo_result) if demo_result else 0
+        st.session_state["pipeline_source"] = "Demo sample (precomputed annotations)"
 
     st.divider()
 
     # Run button
-    if st.button("🚀 Run Pipeline", type="primary", use_container_width=True, disabled=not hf_token):
+    run_clicked = st.button("🚀 Run Pipeline", type="primary", use_container_width=True, disabled=not hf_token)
+    results_container = st.empty()
+    if run_clicked:
         if not uploaded_file and not youtube_url:
             st.warning("Please upload an audio file or enter a YouTube URL.")
             return
+
+        # A new run must never display the previous input's annotations,
+        # including when preparation/inference fails or detects no speech.
+        results_container.empty()
+        for key in ("pipeline_result", "pipeline_duration", "pipeline_source"):
+            st.session_state.pop(key, None)
 
         # Create temp directory for this run
         work_dir = Path(tempfile.mkdtemp(prefix="speech_pipeline_"))
@@ -399,6 +419,10 @@ def main() -> None:
 
             if result is not None:
                 st.session_state["pipeline_result"] = result
+                st.session_state["pipeline_source"] = (
+                    f"Uploaded file: {uploaded_file.name}" if uploaded_file
+                    else f"YouTube: {youtube_url} (video {file_id})"
+                )
                 # Get duration
                 try:
                     import soundfile as sf
@@ -422,10 +446,12 @@ def main() -> None:
 
     # ── Results section ─────────────────────────────────────
     if "pipeline_result" in st.session_state:
-        render_results(
-            st.session_state["pipeline_result"],
-            st.session_state.get("pipeline_duration", 0),
-        )
+        with results_container.container():
+            st.caption(st.session_state.get("pipeline_source", "Current run"))
+            render_results(
+                st.session_state["pipeline_result"],
+                st.session_state.get("pipeline_duration", 0),
+            )
 
 
 if __name__ == "__main__":

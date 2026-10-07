@@ -26,7 +26,7 @@ import librosa
 import numpy as np
 import torch
 from loguru import logger
-from transformers import pipeline as hf_pipeline
+from emotion_model import load_emotion_predictor
 
 from config import EMOTION_MODEL, MIN_SEGMENT_DURATION, SAMPLE_RATE
 
@@ -59,10 +59,9 @@ def get_classifier():
         logger.info("Loading emotion model {} on {}", EMOTION_MODEL, device)
         start = time.perf_counter()
 
-        _classifier = hf_pipeline(
-            "audio-classification",
-            model=EMOTION_MODEL,
-            device=device,
+        _classifier = load_emotion_predictor(
+            EMOTION_MODEL,
+            device=f"cuda:{device}" if device >= 0 else "cpu",
         )
 
         elapsed = time.perf_counter() - start
@@ -195,11 +194,10 @@ def classify_segments(
 # ── helpers ─────────────────────────────────────────────────────
 
 
-def _select_device() -> int | str:
+def _select_device() -> int:
     """Pick the best available compute device.
 
-    Returns an int (CUDA device index) or string for the HF pipeline
-    ``device`` parameter.
+    Returns a CUDA device index, or -1 for CPU.
     """
     if torch.cuda.is_available():
         return 0  # HF pipeline expects int for CUDA
